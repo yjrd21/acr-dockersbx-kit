@@ -1,104 +1,85 @@
-# Modified from https://github.com/shelajev/acr-sbx-kit
-# Original license: Apache License 2.0
-#
-# Modifications:
-# - Migrated SBX kit schema from v2 to v3.
-# - Replaced legacy configuration fields with v3 capabilities.
-#
-# Copyright 2026 ACR SBX kit contributors
 
-# ACR Docker Sandboxes kit
+# ACR Docker Sandboxes Kit (v3)
 
-This mixin installs [Agentic Context Registry (ACR)](https://github.com/jbaruch/agentic-context-registry), a package manager for AI coding-agent instructions. ACR can materialize GitHub-hosted rules, skills, scripts, and hooks for Claude Code, Codex, and Cursor into the sandbox workspace.
+A Docker Sandboxes v3-compatible mixin for installing
+[Agentic Context Registry (ACR)](https://github.com/jbaruch/agentic-context-registry).
 
-The default ACR version is pinned and its release archive is checked against the publisher's `checksums.txt` before installation. A GitHub credential is optional: public repositories work without one, while a token enables private repositories, higher API limits, and package publishing. The real token remains in Docker Sandboxes' host-side credential proxy.
+ACR manages reusable, GitHub-hosted rules, skills, scripts,
+and hooks for AI coding agents, including Codex and Claude Code.
 
-When a project contains `agents.yaml`, the kit instructs the agent to reconcile and realize its declared ACR packages before beginning substantive work in every session. The agent then rereads the resulting project instructions and uses the materialized skills. This keeps project bootstrap automatic while leaving changes and failures visible to the agent and user.
+## Attribution
+
+This repository is a modified fork of the original
+[ACR SBX Kit](https://github.com/shelajev/acr-sbx-kit)
+developed by shelajev and the ACR SBX kit contributors.
+
+The original repository uses Docker Sandbox Kit schema v2.
+This fork migrates the configuration to schema v3 to support
+composition with v3 workloads and mixins.
+
+The original project is licensed under Apache License 2.0.
+The original copyright notices are retained.
+
+## Changes from upstream
+
+- Migrated `schemaVersion` from 2 to 3.
+- Replaced legacy configuration fields with v3 capabilities.
+- Preserved ACR installation and checksum verification.
+- Preserved the optional GitHub credential configuration.
+- Preserved agent instructions for ACR initialization.
 
 ## Usage
 
-Allow kits from this GitHub account once (Docker Hub remains allowed):
+### 1. Allow the GitHub publisher
+
+First check the existing allowed sources:
 
 ```bash
-sbx settings set kit.allowedSources '["docker.io/","github.com/shelajev/"]'
+sbx settings get kit.allowedSources
 ```
 
-Then run the kit directly from this Git repository:
+If only Docker Hub is listed, add this fork's publisher:
 
 ```bash
-sbx run codex --kit "git+https://github.com/shelajev/acr-sbx-kit.git#ref=main" .
+sbx settings set kit.allowedSources '["docker.io/","github.com/yjrd21/"]'
 ```
 
-For reproducible use, replace `main` with a release tag or full commit SHA.
+Preserve any additional publishers already configured.
 
-From a local checkout:
+### 2. Launch with the GitHub-hosted kit
+
+From your project directory:
 
 ```bash
-sbx run codex --kit ./acr-sbx-kit .
+sbx run codex "$(pwd)" \
+  --name sbx-acr \
+  --skills off \
+  --kit 'git+https://github.com/yjrd21/acr-dockersbx-kit.git#ref=main'
 ```
 
-The mixin is agent-independent, so `codex` can be replaced by another Docker Sandboxes agent.
+For reproducible environments, replace `main` with a
+tested commit SHA or release tag.
 
-To install a different ACR release, pass the version without a leading `v`:
+### 3. Alternative: use a local checkout
 
 ```bash
-sbx run codex \
-  --kit "git+https://github.com/shelajev/acr-sbx-kit.git#ref=main" \
-  --kit-arg acr.version=0.2.1 .
+git clone https://github.com/yjrd21/acr-dockersbx-kit.git
 ```
 
-## Using ACR
-
-Inside the sandbox, initialize a project and install a package:
+From the directory containing the cloned repository:
 
 ```bash
-acr install github:OWNER/REPO \
-  --agent codex \
-  --freshness outdated \
-  --non-interactive
-acr realize
+sbx kit validate ./acr-dockersbx-kit
 ```
 
-Use `--agent claude-code`, `--agent codex`, and/or `--agent cursor` to select the layouts ACR should maintain. `acr install` updates dependency state; `acr realize` writes the selected agents' files. Run `acr help COMMAND` for all options.
-
-Commit `agents.yaml` and `.agents/registry.lock` to share the dependency declarations and immutable resolutions with the team. On later sandbox sessions, the agent follows the kit instructions and runs:
+Then run the kit:
 
 ```bash
-acr install --non-interactive
-acr realize
+sbx run codex "$(pwd)/sample-app" \
+  --name sbx-acr \
+  --skills off \
+  --kit ./acr-dockersbx-kit
 ```
 
-Pinned dependencies remain pinned. Dependencies declared as `latest` follow ACR's update and hold policies. When realization introduces skills or session-start hooks that the active agent cannot discover dynamically, the agent will ask for one session restart.
-
-## GitHub authentication
-
-For public packages, no credential is required. For private packages, increased GitHub API limits, or `acr publish`, bind a GitHub token to the kit's optional `acr-github` service using Docker Sandboxes' credential setup when prompted. The distinct service name avoids colliding with an agent's own GitHub credential declaration. The kit exposes only the `proxy-managed` sentinel as `GH_TOKEN`; the proxy injects the real token into requests to `api.github.com`, `codeload.github.com`, and `uploads.github.com`.
-
-## Network policy
-
-The kit allows only the GitHub hosts needed to download and verify ACR releases and for ACR to resolve, download, and publish packages:
-
-- `github.com`
-- `release-assets.githubusercontent.com`
-- `api.github.com`
-- `codeload.github.com`
-- `objects.githubusercontent.com`
-- `uploads.github.com`
-
-## Verify the kit
-
-```bash
-sbx kit validate .
-sbx kit inspect . --json
+Adjust the workspace path to match your local project.
 ```
-
-For a smoke test after sandbox creation:
-
-```bash
-acr version
-acr help install
-```
-
-## License
-
-Apache-2.0. See [LICENSE](LICENSE).

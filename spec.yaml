@@ -1,13 +1,25 @@
 
 # syntax=docker/sandbox-kit:3
+#
+# Based on the ACR SBX Kit by shelajev and contributors:
+# https://github.com/shelajev/acr-sbx-kit
+#
+# Modified in 2026:
+# - Migrated Docker Sandbox Kit specification from v2 to v3.
+# - Converted legacy configuration to v3 capabilities.
+#
+# Licensed under Apache-2.0.
+# See LICENSE for original copyright notices.
+
 schemaVersion: "3"
 kind: mixin
-displayName: Agentic Context Registry
+displayName: Agentic Context Registry (v3)
 description: Install ACR, a package manager for GitHub-hosted agent rules, skills, scripts, and hooks.
 version: "1.0.0"
-sourceUrl: https://github.com/shelajev/acr-sbx-kit
+sourceUrl: https://github.com/yjrd21/acr-dockersbx-kit
 licenses:
   - Apache-2.0
+
 
 args:
   version:
