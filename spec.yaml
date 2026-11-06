@@ -1,0 +1,137 @@
+
+# syntax=docker/sandbox-kit:3
+schemaVersion: "3"
+kind: mixin
+displayName: Agentic Context Registry
+description: Install ACR, a package manager for GitHub-hosted agent rules, skills, scripts, and hooks.
+version: "1.0.0"
+sourceUrl: https://github.com/shelajev/acr-sbx-kit
+licenses:
+  - Apache-2.0
+
+args:
+  version:
+    default: "0.2.1"
+    description: ACR release version to install
+    pattern: '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+
+capabilities:
+  # 1. Network access
+  - type: com.docker.sandbox/network-policy@1
+    config:
+      install:
+        allow:
+          - github.com
+          - release-assets.githubusercontent.com
+      runtime:
+        allow:
+          - github.com
+          - release-assets.githubusercontent.com
+          - api.github.com
+          - codeload.github.com
+          - objects.githubusercontent.com
+          - uploads.github.com
+
+  # 2. Optional GitHub authentication
+  - type: com.docker.sandbox/credential@1
+    optional: true
+    description: Optional GitHub token for ACR
+    config:
+      service: acr-github
+      phase: runtime
+      apiKey:
+        name: GH_TOKEN
+        proxyManaged: true
+        inject:
+          - domain: api.github.com
+            scheme: bearer
+          - domain: codeload.github.com
+            scheme: bearer
+          - domain: uploads.github.com
+            scheme: bearer
+
+  # 3. Install ACR during sandbox creation
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        - user: "0"
+          description: Download, verify and install ACR
+          command: |
+            set -eu
+            version='${{ kit.args.version }}'
+
+            case "$(uname -m)" in
+              x86_64) arch=amd64 ;;
+              aarch64|arm64) arch=arm64 ;;
+              *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+            esac
+
+            asset="acr-linux-${arch}.tar.gz"
+            base="https://github.com/jbaruch/agentic-context-registry/releases/download/v${version}"
+
+            work="$(mktemp -d)"
+            trap 'rm -rf "$work"' EXIT
+
+            curl -fsSL "$base/$asset" -o "$work/$asset"
+            curl -fsSL "$base/checksums.txt" -o "$work/checksums.txt"
+
+            expected="$(awk -v name="$asset" '$2 == name { print $1 }' "$work/checksums.txt")"
+            test -n "$expected"
+
+            actual="$(sha256sum "$work/$asset" | awk '{ print $1 }')"
+            test "$actual" = "$expected"
+
+            tar -xzf "$work/$asset" -C "$work" acr
+            install -m 0755 "$work/acr" /usr/local/bin/acr
+            acr version
+
+  # 4. Instructions for the AI coding agent
+  - type: com.docker.sandbox/agent-context@2
+    config:
+      content: |
+        The `acr` CLI is installed. It manages GitHub-hosted packages
+        of agent rules, skills, scripts, and hooks in the current project.
+
+        Before beginning substantive work in every session, look for
+        `agents.yaml` at the project root.
+
+        If it exists, run these commands from that root:
+
+            acr install --non-interactive
+            acr realize
+
+        This is mandatory project bootstrap. It reconciles declared
+        ACR dependencies and materializes locked rules, skills,
+        scripts, and hooks for the selected agents.
+
+        If either command fails, report the failure and its recovery
+        guidance instead of proceeding with incomplete agent context.
+
+        After realization, reread the active project instruction file,
+        such as `AGENTS.md` or `CLAUDE.md`, before continuing.
+
+        Use newly materialized skills when relevant. Some agents
+        discover new skills or session-start hooks only after
+        restarting. If necessary, inform the user.
+
+        In a project without `agents.yaml`, do not initialize ACR
+        automatically.
+
+        When the user asks to add an ACR package, start with:
+
+            acr install github:OWNER/REPO
+
+        Avoid interactive setup by supplying supported agents
+        (`--agent claude-code`, `--agent codex`, or `--agent cursor`),
+        a freshness policy such as `--freshness outdated`, and
+        `--non-interactive`.
+
+        Then run:
+
+            acr realize
+
+        ACR writes `agents.yaml`, `.agents/registry.lock`, and
+        agent-specific files into the workspace.
+
+        Inspect those changes before committing them.
+        Run `acr help COMMAND` for command-specific options.
